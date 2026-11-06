@@ -1,0 +1,29 @@
+# nghiemthu.vuathau.com.vn trên máy chủ dùng chung 222.255.184.134 (cùng QS Pro / dezon.tech).
+# Cổng 80/443 do Caddy của QS Pro (container qspro-web-1) giữ: app này KHÔNG mở cổng nào,
+# Caddy vào qua mạng qspro_default. Khối site: Caddyfile.nghiemthu, đã chép vào /opt/qspro/infra/deploy/Caddyfile.
+#   cd /opt/vuathau-nghiemthu && git pull && docker compose up -d --build
+name: nghiemthu
+
+services:
+  web:
+    build: .
+    image: nghiemthu-web:latest
+    container_name: nghiemthu-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HTTPS: "1"            # cookie đăng nhập chỉ đi qua HTTPS
+    volumes:
+      - data:/data          # SQLite + ảnh gốc: SAO LƯU volume này
+    networks: [edge]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  data:
+
+networks:
+  edge:
+    name: qspro_default
+    external: true

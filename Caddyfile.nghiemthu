@@ -1,0 +1,15 @@
+# Nghiệm thu ảnh CTV: repo DE-design-source/vuathau-nghiemthu, chạy ở /opt/vuathau-nghiemthu (giữ lại khi deploy QS Pro)
+nghiemthu.vuathau.com.vn {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Ảnh tải lên tới 20 MB/ảnh, tối đa 20 ảnh/lần: không giới hạn body ở Caddy, app tự kiểm.
+	reverse_proxy nghiemthu-web:8000
+}

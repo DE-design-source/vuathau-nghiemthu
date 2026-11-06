@@ -29,3 +29,34 @@ Biến môi trường: `SECRET_KEY` (bắt buộc khi chạy thật), `ANTHROPIC
 - Bắt buộc đủ: địa chỉ, tên + SĐT nhà thầu, tên + SĐT chủ nhà, số tầng, giai đoạn. Thiếu thì báo CTV, không cho gửi.
 - Nhà cách hồ sơ khác dưới 30m: gắn cờ "có thể trùng nhà" cho admin.
 - Thời gian và vị trí của ảnh CTV không sửa được; các ô thông tin do AI điền thì CTV sửa được.
+
+## Deploy: https://nghiemthu.vuathau.com.vn
+
+Máy chủ dùng chung **222.255.184.134** (cùng QS Pro / dezon.tech, SSH `root`). Code ở `/opt/vuathau-nghiemthu` (clone repo này).
+
+```
+khách → DNS nghiemthu.vuathau.com.vn (Cloudflare, DNS only / mây xám) → 222.255.184.134:443
+      → Caddy của QS Pro (qspro-web-1, tự cấp HTTPS Let's Encrypt) → mạng qspro_default → nghiemthu-web:8000
+```
+
+- App không mở cổng ra ngoài. Khối site nằm trong `/opt/qspro/infra/deploy/Caddyfile` (bản gốc: `Caddyfile.nghiemthu`).
+  **Deploy QS Pro phải giữ khối này**, giống khối `pro.vuathau.com.vn`.
+- Dữ liệu (SQLite + ảnh gốc) ở volume Docker `nghiemthu_data`. Đây là chứng từ thanh toán: cần sao lưu.
+- Bí mật ở `/opt/vuathau-nghiemthu/.env` (không có trong git), mẫu ở `.env.example`.
+
+Cập nhật code:
+```bash
+ssh root@222.255.184.134 'cd /opt/vuathau-nghiemthu && git pull && docker compose up -d --build'
+```
+
+Tạo tài khoản admin / kế toán / CEO (CTV tự đăng ký trên web):
+```bash
+ssh root@222.255.184.134 'docker exec nghiemthu-web python app.py adduser 09xxxxxxxx "Họ tên" admin MatKhauManh'
+```
+
+Bật AI: ghi `ANTHROPIC_API_KEY=...` vào `.env` rồi `docker compose up -d` (không cần build lại).
+
+Sửa Caddyfile xong (giữ nguyên file, không thay file mới vì nó được gắn đơn lẻ vào container):
+```bash
+docker exec qspro-web-1 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && docker exec qspro-web-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+```
