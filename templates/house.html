@@ -1,121 +1,271 @@
 {% extends "base.html" %}
+{% from "_uploader.html" import uploader %}
 {% set u = request.state.user %}
+{% set ctv = u.role == 'ctv' %}
+{% set label = (CTV_STATUS if ctv else STATUS)[h.status] %}
 {% block title %}Hồ sơ #{{ h.id }}{% endblock %}
-{% block head %}{% if h.ai_state == 'dang_doc' %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block head %}{% if h.ai_state == 'dang_doc' %}<noscript><meta http-equiv="refresh" content="5"></noscript>{% endif %}{% endblock %}
+{# Tiền: khi CTV còn sửa thì tính theo ảnh hiện tại; đã gửi thì lấy số đã chốt #}
+{% set editing_state = h.status in ('nhap', 'tra_lai') %}
+{% set shown = 0 if h.status == 'tu_choi' else (pay if editing_state else h.amount) %}
+
+{% macro field(name, label, type='text', mode='', auto='', wide=false, hint='') %}
+{% set bad = name in bad_fields %}
+<div class="field{{ ' wide' if wide }}">
+  <label for="f-{{ name }}">{{ label }}</label>
+  <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ h[name] if h[name] is not none else '' }}"
+    {% if mode %}inputmode="{{ mode }}"{% endif %} {% if auto %}autocomplete="{{ auto }}"{% endif %}
+    {% if type == 'number' %}min="1" max="50"{% endif %}
+    {% if bad %}aria-invalid="true"{% endif %} aria-describedby="h-{{ name }}">
+  <p class="hint" id="h-{{ name }}">
+    {% if bad %}<span class="bad-text">Số điện thoại chưa đúng: 10 số, bắt đầu bằng 0.</span>
+    {% elif name in ai_tag %}<span class="ai-tag"><svg class="i" aria-hidden="true"><use href="#i-spark"/></svg>AI đọc từ ảnh, kiểm tra lại</span>
+    {% else %}{{ hint }}{% endif %}
+  </p>
+</div>
+{% endmacro %}
+
 {% block main %}
-<p class="crumb"><a href="{{ HOME[u.role] }}">← Danh sách</a></p>
-<div class="head">
-  <h1>Hồ sơ #{{ h.id }}</h1>
-  <span class="badge {{ STATUS[h.status][1] }}">{{ STATUS[h.status][0] }}</span>
+<p class="crumb"><a href="{{ HOME[u.role] }}"><svg class="i" aria-hidden="true"><use href="#i-left"/></svg>{{ 'Hồ sơ của tôi' if ctv else 'Danh sách' }}</a></p>
+
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Hồ sơ #{{ h.id }} · tạo {{ h.created_at|vn_date }}{% if not ctv %} · CTV {{ h.ctv_name }}{% endif %}</p>
+    <h1>{{ h.address or 'Căn nhà chưa có địa chỉ' }}</h1>
+  </div>
+  <span class="badge lg {{ label[1] }}">{{ label[0] }}</span>
 </div>
 
-{% if h.note and h.status in ('tra_lai', 'tu_choi') %}
-<div class="alert bad" role="alert"><strong>Lý do {{ 'trả lại' if h.status == 'tra_lai' else 'từ chối' }}:</strong> {{ h.note }}</div>
+{% if h.status == 'tra_lai' and h.note %}
+<div class="alert warn" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert"/></svg>
+  <div><strong>Admin trả lại hồ sơ để sửa</strong><p>{{ h.note }}</p></div></div>
+{% elif h.status == 'tu_choi' %}
+<div class="alert bad" role="alert"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+  <div><strong>Hồ sơ bị từ chối</strong><p>{{ h.note or 'Không có lý do.' }}</p></div></div>
 {% endif %}
 {% if h.ai_state == 'dang_doc' %}
-<div class="alert info" role="status">AI đang đọc ảnh (thời gian, địa chỉ, bảng nhà thầu, số tầng)… Trang tự tải lại.</div>
-{% elif h.ai_state == 'loi' %}
-<div class="alert warn" role="status">AI chưa đọc được ảnh lần này. Vui lòng tự điền các ô bên dưới.</div>
+<div class="alert info" role="status" data-ai-poll="/nha/{{ h.id }}/trang-thai">
+  <span class="spinner" aria-hidden="true"></span>
+  <div><strong>AI đang đọc ảnh…</strong><p>Đang đọc giờ, địa chỉ, bảng hiệu nhà thầu và số tầng. Trang tự cập nhật khi xong; bạn vẫn có thể điền thông tin.</p></div>
+</div>
+{% elif h.ai_state == 'loi' and ctv and h.status in ('nhap', 'tra_lai') %}
+<div class="alert warn" role="status"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg>
+  <div><strong>AI chưa đọc được ảnh lần này.</strong><p>Bạn tự điền các ô bên dưới nhé.</p></div></div>
 {% endif %}
 
-<dl class="stats">
-  <div><dt>Ảnh hợp lệ</dt><dd>{{ valid }} / {{ ps|length }}</dd></div>
-  <div><dt>{{ 'Số tiền' if h.amount else 'Dự kiến nhận' }}</dt><dd>{{ money(h.amount or pay) }}</dd></div>
-</dl>
+<div class="house{{ ' editing' if editable }}">
+  <aside class="house-side">
+    <section class="card" aria-labelledby="tp">
+      <h2 id="tp">Tiến trình</h2>
+      <ol class="steps" role="list">
+        {% for s in steps %}
+        <li class="st-{{ s.state }}" {% if s.state == 'current' %}aria-current="step"{% endif %}>
+          <span class="st-dot" aria-hidden="true">
+            {% if s.state == 'done' %}<svg class="i"><use href="#i-check"/></svg>
+            {% elif s.state == 'bad' %}<svg class="i"><use href="#i-x"/></svg>
+            {% elif s.state == 'current' %}<svg class="i"><use href="#i-clock"/></svg>
+            {% else %}{{ loop.index }}{% endif %}
+          </span>
+          <div class="st-body">
+            <strong>{{ s.title }}</strong>
+            <span class="sr-only">{{ {'done':'Đã xong','current':'Đang ở bước này','todo':'Chưa tới','bad':'Bị từ chối'}[s.state] }}.</span>
+            <small>{{ 'Bạn' if ctv and loop.first else s.who }}{% if s.at %} · {{ s.at|vn_time }}{% endif %}</small>
+            {% if s.hint %}<p>{{ s.hint }}</p>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
 
-{% if editable and miss %}
-<div class="alert warn" role="alert">
-  <strong>Cần bổ sung trước khi gửi duyệt:</strong>
-  <ul>{% for m in miss %}<li>{{ m }}</li>{% endfor %}</ul>
+    <section class="card pay" aria-labelledby="py">
+      <h2 id="py">{{ 'Tiền dự kiến' if editing_state else 'Số tiền' }}</h2>
+      <p class="pay-amt">{{ money(shown) }}</p>
+      <div class="meter" role="img" aria-label="{{ valid }} ảnh hợp lệ, cần {{ MIN_PHOTOS }} ảnh để được 35.000đ, {{ MIN_PHOTOS + 1 }} ảnh để được 50.000đ">
+        {% for i in range(MIN_PHOTOS + 1) %}<span class="{{ 'on' if i < valid }}{{ ' mark' if i + 1 in (MIN_PHOTOS, MIN_PHOTOS + 1) }}"></span>{% endfor %}
+      </div>
+      <p class="muted">
+        {% if h.status == 'tu_choi' %}Hồ sơ bị từ chối, không được thanh toán.
+        {% elif not editing_state %}Đã chốt khi gửi duyệt: {{ money(h.amount) }}.
+        {% elif valid < MIN_PHOTOS %}Có {{ valid }} ảnh hợp lệ. Cần thêm {{ MIN_PHOTOS - valid }} ảnh hợp lệ để được 35.000đ.
+        {% elif valid == MIN_PHOTOS %}Có {{ valid }} ảnh hợp lệ: 35.000đ. Thêm 1 ảnh hợp lệ để được 50.000đ.
+        {% else %}Có {{ valid }} ảnh hợp lệ: mức cao nhất 50.000đ.{% endif %}
+      </p>
+      <p class="pay-to"><svg class="i" aria-hidden="true"><use href="#i-wallet"/></svg>
+        <span>{{ 'Tiền chuyển vào' if ctv else 'TK của CTV' }}: <strong>{{ h.ctv_bank or 'chưa có' }}</strong></span></p>
+    </section>
+
+    {% if not ctv %}
+    <section class="card" aria-labelledby="ct">
+      <h2 id="ct">Cộng tác viên</h2>
+      <p><strong>{{ h.ctv_name }}</strong> · <a href="tel:{{ h.ctv_phone }}">{{ h.ctv_phone }}</a></p>
+      {% if h.lat is not none %}<p><a href="https://maps.google.com/?q={{ h.lat }},{{ h.lng }}" target="_blank" rel="noopener"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg>Xem vị trí công trình trên bản đồ</a></p>{% endif %}
+      {% if h.batch_id %}<p>Đợt thanh toán: <a href="/dot/{{ h.batch_id }}">#{{ h.batch_id }}</a></p>{% endif %}
+      {% if h.dup %}<p class="alert warn"><svg class="i" aria-hidden="true"><use href="#i-alert"/></svg>{{ h.dup }}</p>{% endif %}
+    </section>
+    {% endif %}
+
+    {% if u.role == 'admin' and h.status == 'cho_duyet' %}
+    <section class="card review" aria-labelledby="rv">
+      <h2 id="rv">Duyệt hồ sơ</h2>
+      <form method="post" action="/nha/{{ h.id }}/duyet" class="stack">
+        <div class="field">
+          <label for="reason">Lý do (bắt buộc khi trả lại hoặc từ chối)</label>
+          <textarea id="reason" name="reason" rows="3" maxlength="500" placeholder="VD: Ảnh số 3 không thấy bảng hiệu nhà thầu"></textarea>
+        </div>
+        <button class="btn primary wide" name="action" value="duyet"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Duyệt · {{ money(h.amount) }}</button>
+        <div class="actions">
+          <button class="btn" name="action" value="tra_lai">Trả lại cho CTV sửa</button>
+          <button class="btn danger" name="action" value="tu_choi">Từ chối</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+  </aside>
+
+  <div class="house-main">
+    {% if editable %}
+    <section class="card check" aria-labelledby="ck">
+      <h2 id="ck">{% if todo %}Còn {{ todo|length }} mục cần bổ sung{% elif h.status == 'tra_lai' %}Đã sửa theo yêu cầu của admin? Bấm Gửi duyệt lại{% else %}Đã đủ điều kiện gửi duyệt{% endif %}</h2>
+      <ul class="checks" role="list">
+        {% for anchor, text, ok, why in items %}
+        <li class="{{ 'ok' if ok else 'no' }}">
+          <svg class="i" aria-hidden="true"><use href="#i-{{ 'check' if ok else 'x' }}"/></svg>
+          {% if ok %}<span>{{ text }}</span><span class="sr-only"> (đã có)</span>
+          {% else %}<a href="#{{ anchor }}">{{ why }}</a>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="anh" class="block">
+      <div class="block-head">
+        <h2 id="anh" tabindex="-1">Ảnh công trình</h2>
+        <span class="muted">{{ valid }}/{{ ps|length }} ảnh hợp lệ</span>
+      </div>
+      {% if ps %}
+      <ul class="gallery" role="list">
+        {% for p in ps %}{% set bad = problems(p) %}
+        {% set place = p.address or (p.lat is not none and '%.5f, %.5f'|format(p.lat, p.lng)) or '' %}
+        <li class="{{ 'bad' if bad else 'ok' }}">
+          <button type="button" class="ph" data-lightbox data-src="/anh/{{ p.id }}" data-full="/anh/{{ p.id }}?goc=1"
+            data-n="{{ loop.index }}" data-time="{{ (p.exif_time or p.ai_time)|vn_time if (p.exif_time or p.ai_time) else 'Không đọc được giờ chụp' }}"
+            data-place="{{ place or 'Không có vị trí' }}"
+            data-map="{{ 'https://maps.google.com/?q=%s,%s'|format(p.lat, p.lng) if p.lat is not none else '' }}"
+            data-bad="{{ bad|join('|') }}"
+            aria-label="Xem ảnh {{ loop.index }}{{ ': ' ~ bad|join(', ') if bad else ', hợp lệ' }}">
+            <img src="/anh/{{ p.id }}" alt="" loading="lazy">
+            <span class="ph-tag {{ 'bad' if bad else 'ok' }}"><svg class="i" aria-hidden="true"><use href="#i-{{ 'x' if bad else 'check' }}"/></svg>{{ 'Không hợp lệ' if bad else 'Hợp lệ' }}</span>
+          </button>
+          <div class="ph-meta">
+            <p><svg class="i" aria-hidden="true"><use href="#i-clock"/></svg>{{ (p.exif_time or p.ai_time)|vn_time or 'Không rõ giờ' }}</p>
+            {% if bad %}<p class="bad-text">{{ bad[0] }}{% if bad|length > 1 %} (+{{ bad|length - 1 }}){% endif %}</p>
+            {% else %}<p class="muted"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg>{{ place or 'Không có vị trí' }}</p>{% endif %}
+          </div>
+          {% if editable %}
+          <form method="post" action="/nha/{{ h.id }}/anh/{{ p.id }}/xoa" data-confirm="Xoá ảnh {{ loop.index }} khỏi hồ sơ?">
+            <button class="icon-btn ph-del" aria-label="Xoá ảnh {{ loop.index }}"><svg class="i"><use href="#i-trash"/></svg></button>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">Hồ sơ chưa có ảnh nào.</p>
+      {% endif %}
+      {% if editable and ps|length < MAX_PHOTOS %}
+      <details class="add-more" {% if valid < MIN_PHOTOS %}open{% endif %}>
+        <summary><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>Thêm ảnh{% if valid < MIN_PHOTOS %} (cần thêm ít nhất {{ MIN_PHOTOS - valid }} ảnh hợp lệ){% endif %}</summary>
+        {{ uploader("/nha/%d/anh"|format(h.id), "Tải thêm ảnh", ps|length, valid) }}
+      </details>
+      {% elif editable %}
+      <p class="alert warn"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg><span>Hồ sơ đã đủ {{ MAX_PHOTOS }} ảnh. Xoá bớt ảnh không hợp lệ (nút thùng rác trên ảnh) để tải ảnh khác.</span></p>
+      {% endif %}
+    </section>
+
+    <section aria-labelledby="tt" class="block">
+      <div class="block-head"><h2 id="tt">Thông tin công trình</h2></div>
+      {% if editable %}
+      <form method="post" id="info" class="card form" data-dirty-guard>
+        <fieldset>
+          <legend>Công trình</legend>
+          <div class="grid">
+            {{ field('address', 'Địa chỉ', auto='street-address', wide=true, hint='Số nhà, đường, phường/xã, quận/huyện, tỉnh.') }}
+            {{ field('floors', 'Số tầng', 'number', 'numeric', hint='Tính cả tầng đang xây, không tính tum.') }}
+          </div>
+          <fieldset class="chips" id="f-stage" {% if 'stage' in ai_tag %}aria-describedby="h-stage"{% endif %}>
+            <legend>Giai đoạn thi công</legend>
+            {% for s in STAGES %}
+            <label class="chip"><input type="radio" name="stage" value="{{ s }}" {{ 'checked' if s == h.stage }}><span>{{ s }}</span></label>
+            {% endfor %}
+            {% if 'stage' in ai_tag %}<p class="hint" id="h-stage"><span class="ai-tag"><svg class="i" aria-hidden="true"><use href="#i-spark"/></svg>AI đoán từ ảnh, kiểm tra lại</span></p>{% endif %}
+          </fieldset>
+        </fieldset>
+        <fieldset>
+          <legend>Nhà thầu <small>(trên bảng hiệu, bạt che công trình)</small></legend>
+          <div class="grid">
+            {{ field('contractor_name', 'Tên nhà thầu') }}
+            {{ field('contractor_phone', 'SĐT nhà thầu', 'tel', 'tel') }}
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Chủ nhà</legend>
+          <div class="grid">
+            {{ field('owner_name', 'Tên chủ nhà') }}
+            {{ field('owner_phone', 'SĐT chủ nhà', 'tel', 'tel') }}
+          </div>
+        </fieldset>
+      </form>
+      {% else %}
+      <dl class="card facts">
+        <div class="wide"><dt>Địa chỉ</dt><dd>{{ h.address or '—' }}</dd></div>
+        <div><dt>Số tầng</dt><dd>{{ h.floors or '—' }}</dd></div>
+        <div><dt>Giai đoạn</dt><dd>{{ h.stage or '—' }}</dd></div>
+        <div><dt>Nhà thầu</dt><dd>{{ h.contractor_name or '—' }}{% if h.contractor_phone %}<br><a href="tel:{{ h.contractor_phone }}">{{ h.contractor_phone }}</a>{% endif %}</dd></div>
+        <div><dt>Chủ nhà</dt><dd>{{ h.owner_name or '—' }}{% if h.owner_phone %}<br><a href="tel:{{ h.owner_phone }}">{{ h.owner_phone }}</a>{% endif %}</dd></div>
+      </dl>
+      {% endif %}
+    </section>
+
+    {% if logs %}
+    <section aria-labelledby="ls" class="block">
+      <div class="block-head"><h2 id="ls">Lịch sử</h2></div>
+      <ol class="timeline" role="list">
+        {% for l in logs|reverse %}
+        <li><time datetime="{{ l.at|replace(' ', 'T') }}">{{ l.at|vn_time }}</time>
+          <p><strong>{{ l.action }}</strong> · {{ l.name }}{% if l.note %}<br><span class="muted">{{ l.note }}</span>{% endif %}</p></li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+  </div>
+</div>
+
+{% if editable %}
+<div class="actionbar">
+  <div class="actionbar-in">
+    <p class="actionbar-t">{% if todo %}<svg class="i" aria-hidden="true"><use href="#i-alert"/></svg>Còn thiếu {{ todo|length }} mục{% else %}<svg class="i" aria-hidden="true"><use href="#i-check"/></svg>{{ 'Sửa xong thì gửi duyệt lại' if h.status == 'tra_lai' else 'Đủ điều kiện gửi duyệt' }}{% endif %}</p>
+    <button class="btn" form="info" name="action" value="luu">Lưu nháp</button>
+    <button class="btn primary" form="info" name="action" value="gui">{{ 'Gửi duyệt lại' if h.status == 'tra_lai' else 'Gửi duyệt' }}</button>
+  </div>
 </div>
 {% endif %}
 
-{% if u.role == 'admin' and h.status == 'cho_duyet' %}
-<section class="card stack review" aria-labelledby="rv">
-  <h2 id="rv">Duyệt hồ sơ</h2>
-  {% if h.dup %}<p class="alert warn">{{ h.dup }}</p>{% endif %}
-  <p>CTV: <strong>{{ h.ctv_name }}</strong> · {{ h.ctv_phone }}
-    {% if h.lat is not none %} · <a href="https://maps.google.com/?q={{ h.lat }},{{ h.lng }}" target="_blank" rel="noopener">Xem vị trí trên bản đồ</a>{% endif %}</p>
-  <form method="post" action="/nha/{{ h.id }}/duyet" class="stack">
-    <label>Lý do (bắt buộc khi trả lại hoặc từ chối)
-      <textarea name="reason" rows="2" maxlength="500"></textarea></label>
-    <div class="actions">
-      <button class="primary" name="action" value="duyet">Duyệt · {{ money(h.amount) }}</button>
-      <button name="action" value="tra_lai">Trả lại cho CTV sửa</button>
-      <button class="danger" name="action" value="tu_choi">Từ chối</button>
-    </div>
-  </form>
-</section>
-{% endif %}
-
-<section aria-labelledby="ph">
-  <h2 id="ph">Ảnh ({{ ps|length }})</h2>
-  <ul class="photos" role="list">
-    {% for p in ps %}{% set bad = problems(p) %}
-    <li class="{{ 'bad' if bad else 'ok' }}">
-      <a href="/anh/{{ p.id }}?goc=1" target="_blank" rel="noopener"><img src="/anh/{{ p.id }}" alt="Ảnh {{ loop.index }}" loading="lazy"></a>
-      <div class="meta">
-        <p>{{ p.exif_time or p.ai_time or 'Không rõ giờ' }}</p>
-        <p class="muted">{{ p.address or (p.lat is not none and '%.5f, %.5f'|format(p.lat, p.lng)) or 'Không rõ vị trí' }}</p>
-        {% if bad %}{% for b in bad %}<p class="bad-text">✗ {{ b }}</p>{% endfor %}{% else %}<p class="ok-text">✓ Hợp lệ</p>{% endif %}
-        {% if editable %}
-        <form method="post" action="/nha/{{ h.id }}/anh/{{ p.id }}/xoa"><button class="link" aria-label="Xoá ảnh {{ loop.index }}">Xoá</button></form>
-        {% endif %}
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
-  {% if editable %}
-  <form method="post" action="/nha/{{ h.id }}/anh" enctype="multipart/form-data" class="inline">
-    <label>Thêm ảnh <input type="file" name="files" accept="image/jpeg,image/png" multiple required></label>
-    <button>Tải lên</button>
-  </form>
-  {% endif %}
-</section>
-
-<section aria-labelledby="tt">
-  <h2 id="tt">Thông tin công trình</h2>
-  {% if editable %}
-  <form method="post" class="card grid">
-    {% macro field(name, label, type='text', mode='') %}
-    <label>{{ label }}
-      <input name="{{ name }}" type="{{ type }}" value="{{ h[name] or '' }}" {% if mode %}inputmode="{{ mode }}"{% endif %}
-        {% if not h[name] %}aria-invalid="true"{% endif %}></label>
-    {% endmacro %}
-    <label class="wide">Địa chỉ công trình
-      <input name="address" value="{{ h.address }}" {% if not h.address %}aria-invalid="true"{% endif %}></label>
-    {{ field('contractor_name', 'Tên nhà thầu') }}
-    {{ field('contractor_phone', 'SĐT nhà thầu', 'tel', 'tel') }}
-    {{ field('owner_name', 'Tên chủ nhà') }}
-    {{ field('owner_phone', 'SĐT chủ nhà', 'tel', 'tel') }}
-    {{ field('floors', 'Số tầng', 'number', 'numeric') }}
-    <label>Giai đoạn thi công
-      <select name="stage" {% if not h.stage %}aria-invalid="true"{% endif %}>
-        <option value="">Chọn…</option>
-        {% for s in STAGES %}<option {{ 'selected' if s == h.stage }}>{{ s }}</option>{% endfor %}
-      </select></label>
-    <div class="actions wide">
-      <button name="action" value="luu">Lưu nháp</button>
-      <button class="primary" name="action" value="gui">Gửi duyệt</button>
-    </div>
-  </form>
-  {% else %}
-  <dl class="info card">
-    <dt>Địa chỉ</dt><dd>{{ h.address or '—' }}</dd>
-    <dt>Nhà thầu</dt><dd>{{ h.contractor_name or '—' }} · {{ h.contractor_phone or '—' }}</dd>
-    <dt>Chủ nhà</dt><dd>{{ h.owner_name or '—' }} · {{ h.owner_phone or '—' }}</dd>
-    <dt>Số tầng</dt><dd>{{ h.floors or '—' }}</dd>
-    <dt>Giai đoạn</dt><dd>{{ h.stage or '—' }}</dd>
-    {% if u.role != 'ctv' %}<dt>CTV</dt><dd>{{ h.ctv_name }} · {{ h.ctv_phone }} · {{ h.ctv_bank }}</dd>{% endif %}
-    {% if h.batch_id and u.role != 'ctv' %}<dt>Đợt thanh toán</dt><dd><a href="/dot/{{ h.batch_id }}">#{{ h.batch_id }}</a></dd>{% endif %}
-  </dl>
-  {% endif %}
-</section>
-
-{% if logs %}
-<section aria-labelledby="ls">
-  <h2 id="ls">Lịch sử</h2>
-  <ol class="log">{% for l in logs %}<li><time>{{ l.at[:16] }}</time> {{ l.name }}: {{ l.action }}{% if l.note %} · {{ l.note }}{% endif %}</li>{% endfor %}</ol>
-</section>
-{% endif %}
+<dialog class="lightbox" aria-label="Xem ảnh">
+  <div class="lb-top">
+    <p class="lb-n" aria-live="polite"></p>
+    <a class="lb-full" target="_blank" rel="noopener">Ảnh gốc <svg class="i" aria-hidden="true"><use href="#i-external"/></svg></a>
+    <button type="button" class="icon-btn lb-close" aria-label="Đóng"><svg class="i"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="lb-stage">
+    <button type="button" class="icon-btn lb-prev" aria-label="Ảnh trước"><svg class="i"><use href="#i-left"/></svg></button>
+    <img alt="">
+    <button type="button" class="icon-btn lb-next" aria-label="Ảnh sau"><svg class="i"><use href="#i-right"/></svg></button>
+  </div>
+  <div class="lb-info" aria-live="polite" aria-atomic="true">
+    <p><svg class="i" aria-hidden="true"><use href="#i-clock"/></svg><span class="lb-time"></span></p>
+    <p><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><span class="lb-place"></span> <a class="lb-map" target="_blank" rel="noopener">Bản đồ</a></p>
+    <ul class="lb-bad" role="list"></ul>
+  </div>
+</dialog>
 {% endblock %}

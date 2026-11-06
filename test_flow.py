@@ -75,12 +75,16 @@ blobs = [jpeg(i) for i in range(6)]
 r = c.post("/nha", files=files(*blobs))
 hid = int(r.headers["location"].rsplit("/", 1)[1])
 page = c.get(f"/nha/{hid}").text
-assert "6 / 6" in page and "50.000đ" in page, "6 ảnh hợp lệ phải dự kiến 50.000đ"
+assert "6/6 ảnh hợp lệ" in page and "50.000đ" in page, "6 ảnh hợp lệ phải dự kiến 50.000đ"
+assert "Còn 7 mục cần bổ sung" in page and 'href="#f-contractor_name"' in page, "checklist trỏ tới ô còn thiếu"
+assert c.get("/nha/moi").status_code == 200 and "Chọn ảnh từ thư viện" in c.get("/nha/moi").text
+st = c.get(f"/nha/{hid}/trang-thai").json()
+assert st["status"] == "nhap" and set(st["fields"]) == {k for k, _ in A.FIELDS}
 
 # gửi khi thiếu trường: bị chặn, báo đúng trường thiếu
 c.post(f"/nha/{hid}", data={"action": "gui", "address": "12 Lê Lợi"})
 page = c.get(f"/nha/{hid}").text
-assert "Chưa gửi được" in page and "Thiếu tên nhà thầu" in page and "Đang soạn" in page
+assert "Chưa gửi được" in page and "Thiếu tên nhà thầu" in page and "Chưa gửi duyệt" in page
 
 fields = {"address": "12 Lê Lợi, Q.1", "contractor_name": "Xây dựng Phát Đạt", "contractor_phone": "0988.111.222",
           "owner_name": "Trần B", "owner_phone": "0977 333 444", "floors": "3", "stage": P.STAGES[1]}
@@ -94,15 +98,15 @@ assert c.post(f"/nha/{hid}", data={**fields, "action": "luu"}).status_code == 40
 assert c.get("/duyet").status_code == 403
 
 # chống trùng: file y hệt bị từ chối; bản resize bị gắn cờ, không được tính; nhà sát bên bị cảnh báo
-r = c.post("/nha", files=files(blobs[0]))
-assert r.headers["location"] == "/cua-toi" and "đã nộp ở hồ sơ" in c.get("/cua-toi").text
+r = c.post("/nha", files=files(blobs[0]), headers={"X-Upload": "1"})  # đường tải ảnh bằng JS: nhận JSON
+assert r.json() == {"url": "/nha/moi"} and "đã nộp ở hồ sơ" in c.get("/nha/moi").text
 resized = io.BytesIO()
 Image.open(io.BytesIO(blobs[1])).resize((300, 225)).save(resized, "JPEG", exif=Image.open(io.BytesIO(blobs[1])).getexif())
 r = c.post("/nha", files=files(resized.getvalue(), *[jpeg(100 + i) for i in range(4)]))
 hid2 = int(r.headers["location"].rsplit("/", 1)[1])
 page = c.get(f"/nha/{hid2}").text
-assert f"Trùng ảnh đã nộp (hồ sơ #{hid})" in page and "4 / 5" in page
-c.post(f"/nha/{hid2}/anh", files=files(jpeg(200)))
+assert f"Trùng ảnh đã nộp (hồ sơ #{hid})" in page and "4/5 ảnh hợp lệ" in page
+assert c.post(f"/nha/{hid2}/anh", files=files(jpeg(200)), headers={"X-Upload": "1"}).json() == {"url": f"/nha/{hid2}#anh"}
 c.post(f"/nha/{hid2}", data={**fields, "action": "gui"})
 with A.db() as d:
     h2 = d.execute("select * from houses where id=?", (hid2,)).fetchone()
@@ -152,4 +156,21 @@ assert c.get("/tong-quan?trang_thai=xyz").status_code == 200
 login(c, "0911222333")
 page = c.get("/cua-toi").text
 assert re.search(r"Đã nhận</dt><dd>50\.000đ", page), "CTV thấy đã nhận 50.000đ"
+assert "1 hồ sơ cần bạn xử lý" in page and "Đã nhận tiền" in page
+can = c.get("/cua-toi?loc=can_lam").text
+assert f'href="/nha/{hid2}"' in can and f'href="/nha/{hid}"' not in can, "lọc 'cần bạn xử lý'"
+assert "Lý do: Trùng nhà #1" in can
+page = c.get(f"/nha/{hid}").text  # 5 bước đều xong, lịch sử gồm cả các bước của đợt thanh toán
+assert page.count("st-done") == 5 and "CEO duyệt chi" in page and "Đã chi tiền" in page
+page = c.get(f"/nha/{hid2}").text
+assert 'class="st-current"' in page and "Admin trả lại hồ sơ để sửa" in page
+
+# DB tạo trước khi có cột ai_json vẫn chạy được
+import sqlite3
+old_db = os.path.join(tempfile.mkdtemp(), "old.db")
+sqlite3.connect(old_db).executescript(
+    "create table houses(id integer primary key, ctv_id integer, status text, ai_state text not null default '')")
+A.DB = old_db
+A.init()
+assert "ai_json" in {r[1] for r in sqlite3.connect(old_db).execute("pragma table_info(houses)")}
 print("OK: toàn bộ luồng nộp → duyệt → lập đợt → CEO → chi tiền")

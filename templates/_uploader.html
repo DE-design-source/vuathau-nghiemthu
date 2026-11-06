@@ -1,0 +1,22 @@
+{# Ô chọn ảnh dùng chung. Không có JS vẫn gửi form bình thường; có JS thì xem trước, bỏ bớt, kéo thả, thanh % tải lên (app.js). #}
+{% macro uploader(action, button, have=0, valid=0) %}
+<form class="uploader" method="post" action="{{ action }}" enctype="multipart/form-data"
+      data-uploader data-have="{{ have }}" data-valid="{{ valid }}" data-max="{{ MAX_PHOTOS }}" data-min="{{ MIN_PHOTOS }}">
+  <label class="drop">
+    <input type="file" name="files" accept="image/jpeg,image/png" multiple required>
+    <svg class="i drop-i" aria-hidden="true"><use href="#i-upload"/></svg>
+    <span class="drop-t">Chọn ảnh từ thư viện</span>
+    <span class="drop-s">hoặc kéo thả ảnh vào đây · JPG/PNG · tối đa {{ MAX_PHOTOS - have }} ảnh, mỗi ảnh dưới 20MB</span>
+  </label>
+  <ul class="previews" role="list" hidden></ul>
+  <p class="upl-sum" aria-live="polite" hidden></p>
+  <div class="upl-bar" hidden>
+    <div class="bar"><span></span></div>
+    <p class="upl-pct" aria-live="polite"></p>
+  </div>
+  <p class="upl-err" role="alert" hidden></p>
+  <button class="btn primary wide" type="submit">
+    <svg class="i" aria-hidden="true"><use href="#i-upload"/></svg><span class="btn-t">{{ button }}</span>
+  </button>
+</form>
+{% endmacro %}

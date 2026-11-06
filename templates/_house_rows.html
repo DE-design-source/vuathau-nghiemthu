@@ -4,10 +4,12 @@
   {% for h in rows %}
   <li>
     <a href="/nha/{{ h.id }}">
+      {% set st = stats[h.id] if stats is defined else none %}
+      {% if st and st.cover %}<img class="thumb" src="/anh/{{ st.cover }}" alt="" loading="lazy">{% endif %}
       <span class="id">#{{ h.id }}</span>
       <span class="main">
         <strong>{{ h.address or 'Chưa có địa chỉ' }}</strong>
-        <small>{% if show_ctv %}{{ h.ctv_name }} · {% endif %}{{ h.n }} ảnh · {{ h.created_at[:16] }}{% if h.dup %} · <b class="warn-text">Có thể trùng nhà</b>{% endif %}</small>
+        <small>{% if show_ctv %}{{ h.ctv_name }} · {% endif %}{% if st %}{{ st.valid }}/{{ st.n }} ảnh hợp lệ{% else %}{{ h.n }} ảnh{% endif %} · {{ h.created_at[:16] }}{% if h.dup %} · <b class="warn-text">Có thể trùng nhà</b>{% endif %}</small>
       </span>
       <span class="side">
         <span class="badge {{ STATUS[h.status][1] }}">{{ STATUS[h.status][0] }}</span>

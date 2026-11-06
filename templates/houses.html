@@ -1,23 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block main %}
-<h1>{{ title }}</h1>
-
-{% if mine %}
-<dl class="stats">
-  <div><dt>Đã nhận</dt><dd>{{ money(paid) }}</dd></div>
-  <div><dt>Đang chờ chi</dt><dd>{{ money(pending) }}</dd></div>
-</dl>
-
-<form method="post" action="/nha" enctype="multipart/form-data" class="card stack">
-  <h2>Nộp hồ sơ nhà mới</h2>
-  <label>Ảnh chụp bằng Timemark
-    <input type="file" name="files" accept="image/jpeg,image/png" multiple required>
-    <small>Chọn ảnh từ thư viện (không chụp lại màn hình). Mỗi căn: {{ MIN_PHOTOS }} ảnh hợp lệ được 35.000đ, từ 6 ảnh được 50.000đ. Nên chụp cả bảng hiệu nhà thầu.</small>
-  </label>
-  <button class="primary">Tải ảnh lên</button>
-</form>
-{% else %}
+<div class="page-head"><h1>{{ title }}</h1></div>
 <form method="get" class="filter">
   <label>Trạng thái
     <select name="trang_thai" onchange="this.form.submit()">
@@ -26,9 +10,5 @@
   </label>
   <noscript><button>Lọc</button></noscript>
 </form>
-{% endif %}
-
-{% with show_ctv = not mine, empty_msg = 'Chưa có hồ sơ nào. Tải ảnh căn nhà đầu tiên ở trên.' if mine else 'Không có hồ sơ ở trạng thái này.' %}
-{% include "_house_rows.html" %}
-{% endwith %}
+{% with show_ctv = true, empty_msg = 'Không có hồ sơ ở trạng thái này.' %}{% include "_house_rows.html" %}{% endwith %}
 {% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% set u = request.state.user %}
+{% block title %}Hồ sơ của tôi{% endblock %}
+{% block main %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Xin chào, {{ u.name }}</p>
+    <h1>Hồ sơ của tôi</h1>
+  </div>
+  <a class="btn primary" href="/nha/moi"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>Nộp hồ sơ nhà mới</a>
+</div>
+
+<dl class="stats">
+  <div><dt>Đã nhận</dt><dd>{{ money(paid) }}</dd></div>
+  <div><dt>Chờ thanh toán</dt><dd>{{ money(pending) }}</dd></div>
+  <div><dt>Tổng hồ sơ</dt><dd>{{ total }}</dd></div>
+</dl>
+
+{% if count.can_lam and loc != 'can_lam' %}
+<a class="callout warn" href="?loc=can_lam#ds">
+  <svg class="i" aria-hidden="true"><use href="#i-alert"/></svg>
+  <span><strong>{{ count.can_lam }} hồ sơ cần bạn xử lý.</strong> Bổ sung hoặc sửa lại để gửi duyệt.</span>
+  <svg class="i" aria-hidden="true"><use href="#i-right"/></svg>
+</a>
+{% endif %}
+
+{% if total %}
+<section aria-labelledby="ds">
+  <h2 id="ds" class="sr-only">Danh sách hồ sơ</h2>
+  <nav class="tabs" aria-label="Lọc hồ sơ theo trạng thái">
+    {% for k, (label, _) in tabs.items() %}{% if not k or count[k] %}
+    <a href="?loc={{ k }}#ds" {% if k == loc %}aria-current="page"{% endif %}>{{ label }} <span class="tab-n">{{ count[k] }}</span></a>
+    {% endif %}{% endfor %}
+  </nav>
+
+  {% if rows %}
+  <ul class="cases" role="list">
+    {% for h in rows %}{% set st = stats[h.id] %}{% set s = CTV_STATUS[h.status] %}
+    <li>
+      <a class="case" href="/nha/{{ h.id }}">
+        <span class="case-cover">
+          {% if st.cover %}<img src="/anh/{{ st.cover }}" alt="" loading="lazy">
+          {% else %}<svg class="i" aria-hidden="true"><use href="#i-image"/></svg>{% endif %}
+          <span class="case-n"><svg class="i" aria-hidden="true"><use href="#i-camera"/></svg>{{ st.n }}</span>
+        </span>
+        <span class="case-body">
+          <span class="case-top">
+            <span class="badge {{ s[1] }}">{{ s[0] }}</span>
+            <span class="case-amt">
+              {% if h.status == 'tu_choi' %}0đ
+              {% elif h.amount and h.status not in ('nhap', 'tra_lai') %}{{ money(h.amount) }}
+              {% elif amount(st.valid) %}<small>dự kiến </small>{{ money(amount(st.valid)) }}
+              {% else %}<small>cần thêm ảnh</small>{% endif %}
+            </span>
+          </span>
+          <strong class="case-addr">{{ h.address or 'Chưa có địa chỉ' }}</strong>
+          <span class="muted">#{{ h.id }} · {{ h.created_at|vn_date }} · {{ st.valid }}/{{ st.n }} ảnh hợp lệ</span>
+          {% if h.status in ('tra_lai', 'tu_choi') and h.note %}<span class="case-note">Lý do: {{ h.note }}</span>{% endif %}
+          {% if h.status != 'tu_choi' %}
+          <span class="mini-steps" role="img" aria-label="Đã qua {{ STEP_OF[h.status] }} trên 5 bước">
+            {% for i in range(5) %}<span class="{{ 'on' if i < STEP_OF[h.status] }}"></span>{% endfor %}
+          </span>
+          {% endif %}
+        </span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty" role="status">Không có hồ sơ nào ở mục này. <a href="?#ds">Xem tất cả</a></p>
+  {% endif %}
+</section>
+
+<details class="card help">
+  <summary>Cách nhận tiền và điều kiện ảnh hợp lệ</summary>
+  {% include "_guide.html" %}
+</details>
+{% else %}
+<section class="card onboard" aria-labelledby="bd">
+  <h2 id="bd">Bắt đầu nhận tiền từ ảnh công trình</h2>
+  {% include "_guide.html" %}
+  <a class="btn primary wide" href="/nha/moi"><svg class="i" aria-hidden="true"><use href="#i-camera"/></svg>Nộp hồ sơ đầu tiên</a>
+</section>
+{% endif %}
+{% endblock %}

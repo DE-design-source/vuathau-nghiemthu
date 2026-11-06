@@ -34,7 +34,7 @@
 
 <section aria-labelledby="ds">
   <h2 id="ds">Hồ sơ: {{ STATUS[filter][0] if filter else 'tất cả' }}{% if rows|length == LIMIT %} ({{ LIMIT }} hồ sơ mới nhất){% endif %}</h2>
-  {% with show_ctv = true, empty_msg = 'Không có hồ sơ ở bước này.' %}{% include "_house_rows.html" %}{% endwith %}
+  {% with show_ctv = true, empty_msg = 'Không có hồ sơ ở bước này.', stats = pstats %}{% include "_house_rows.html" %}{% endwith %}
 </section>
 
 <section aria-labelledby="bt">
