@@ -51,7 +51,7 @@ ssh root@222.255.184.134 'cd /opt/vuathau-nghiemthu && git pull && docker compos
 
 Tạo tài khoản admin / kế toán / CEO (CTV tự đăng ký trên web):
 ```bash
-ssh root@222.255.184.134 'docker exec nghiemthu-web python app.py adduser 09xxxxxxxx "Họ tên" admin MatKhauManh'
+ssh root@222.255.184.134 'docker exec nghiemthu-web python app.py adduser <tên hoặc SĐT> "Họ tên" admin MatKhauManh'
 ```
 
 Bật AI: ghi `ANTHROPIC_API_KEY=...` vào `.env` rồi `docker compose up -d` (không cần build lại).

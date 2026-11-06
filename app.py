@@ -1,7 +1,7 @@
 """Nghiệm thu ảnh công trình: CTV nộp → admin duyệt → kế toán lập đợt → CEO duyệt → kế toán chi tiền.
 
 Chạy:  uvicorn app:app --reload
-Tạo tài khoản nội bộ:  python app.py adduser 0901234567 "Tên" admin|ketoan|ceo matkhau
+Tạo tài khoản nội bộ:  python app.py adduser <tên đăng nhập hoặc SĐT> "Tên" admin|ketoan|ceo matkhau
 """
 import csv
 import hashlib
@@ -102,6 +102,11 @@ def phone(s: str) -> str:
     return re.sub(r"[\s.\-]", "", s or "")
 
 
+def login_id(s: str) -> str:
+    """CTV đăng nhập bằng SĐT, nhân viên nội bộ có thể dùng tên (admin, hungcao...)."""
+    return phone(s).lower()
+
+
 def money(n) -> str:
     return f"{n or 0:,}".replace(",", ".") + "đ"
 
@@ -157,7 +162,7 @@ def login_form(request: Request):
 
 @app.post("/login")
 def login(request: Request, phone_: str = Form(..., alias="phone"), pw: str = Form(...)):
-    p = phone(phone_)
+    p = login_id(phone_)
     n, since = FAILS.get(p, (0, 0))
     if n >= 5 and time.time() - since < 300:
         flash(request, "Sai mật khẩu nhiều lần, thử lại sau 5 phút.")
@@ -553,8 +558,11 @@ def http_error(request: Request, e: HTTPException):
 
 if __name__ == "__main__" and sys.argv[1:2] == ["adduser"]:
     _, _, ph, name, role, pw = sys.argv
-    assert role in ROLES and PHONE_RE.match(phone(ph)), "role: ctv|admin|ketoan|ceo, SĐT hợp lệ"
+    ph = login_id(ph)
+    assert role in ROLES, "role: ctv|admin|ketoan|ceo"
+    assert PHONE_RE.match(ph) or (role != "ctv" and re.fullmatch(r"[a-z0-9_]{3,30}", ph)), \
+        "CTV dùng SĐT; nhân viên dùng SĐT hoặc tên 3-30 ký tự a-z, 0-9, _"
     with db() as c:
         c.execute("insert into users(phone,name,role,pw) values(?,?,?,?) on conflict(phone) do update set "
-                  "name=excluded.name, role=excluded.role, pw=excluded.pw", (phone(ph), name, role, hash_pw(pw)))
-    print("OK", phone(ph), role)
+                  "name=excluded.name, role=excluded.role, pw=excluded.pw", (ph, name, role, hash_pw(pw)))
+    print("OK", ph, role)

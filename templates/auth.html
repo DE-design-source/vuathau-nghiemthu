@@ -7,9 +7,14 @@
     {% if mode == 'register' %}
     <label>Họ tên <input name="name" required autocomplete="name"></label>
     {% endif %}
+    {% if mode == 'login' %}
+    <label>Số điện thoại hoặc tên đăng nhập
+      <input name="phone" required autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+    <label>Mật khẩu <input name="pw" type="password" required autocomplete="current-password"></label>
+    {% else %}
     <label>Số điện thoại <input name="phone" type="tel" inputmode="tel" required autocomplete="tel" placeholder="0901234567"></label>
-    <label>Mật khẩu <input name="pw" type="password" required minlength="6"
-      autocomplete="{{ 'current-password' if mode == 'login' else 'new-password' }}"></label>
+    <label>Mật khẩu <input name="pw" type="password" required minlength="6" autocomplete="new-password"></label>
+    {% endif %}
     {% if mode == 'register' %}
     <label>Tài khoản nhận tiền
       <input name="bank" required placeholder="Vietcombank 0123456789 NGUYEN VAN A">

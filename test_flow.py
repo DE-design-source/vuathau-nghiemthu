@@ -3,6 +3,8 @@ import io
 import os
 import random
 import re
+import subprocess
+import sys
 import tempfile
 from datetime import datetime, timedelta
 
@@ -59,8 +61,12 @@ assert round(P.meters(10.0, 106.0, 10.0001, 106.0)) == 11
 
 c = TestClient(A.app, follow_redirects=False)
 with A.db() as d:
-    for ph, role in (("0900000001", "admin"), ("0900000002", "ketoan"), ("0900000003", "ceo")):
+    for ph, role in (("0900000002", "ketoan"), ("0900000003", "ceo")):
         d.execute("insert into users(phone,name,role,pw) values(?,?,?,?)", (ph, role.upper(), role, A.hash_pw("matkhau1")))
+# nhân viên tạo bằng lệnh adduser, đăng nhập bằng tên (không phân biệt hoa thường), CTV thì bắt buộc SĐT
+cli = [sys.executable, "app.py", "adduser"]
+subprocess.run(cli + ["Admin", "Quản trị", "admin", "123"], check=True, capture_output=True)
+assert subprocess.run(cli + ["tenctv", "X", "ctv", "123456"], capture_output=True).returncode != 0
 
 # CTV đăng ký, nộp 6 ảnh
 r = c.post("/dang-ky", data={"name": "Nguyễn Văn A", "phone": "0911 222 333", "pw": "matkhau1", "bank": "VCB 0123 NGUYEN VAN A"})
@@ -103,7 +109,7 @@ with A.db() as d:
 assert h2["status"] == "cho_duyet" and h2["amount"] == 35_000 and f"hồ sơ #{hid}" in h2["dup"], dict(h2)
 
 # admin: duyệt 1, trả lại 1 (phải có lý do)
-login(c, "0900000001")
+login(c, "ADMIN ", "123")
 assert "Có thể trùng nhà" in c.get("/duyet").text
 c.post(f"/nha/{hid2}/duyet", data={"action": "tra_lai"})
 assert c.get(f"/nha/{hid2}").text.count("Chờ admin duyệt") >= 1
