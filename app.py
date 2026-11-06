@@ -41,6 +41,11 @@ STATUS = {  # mã: (nhãn, tông màu badge)
 BSTATUS = {"cho_ceo": ("Chờ CEO duyệt", "wait"), "cho_chi": ("Chờ chi tiền", "ok"),
            "da_chi": ("Đã chi", "done"), "tra_lai": ("CEO trả lại", "bad")}
 EDITABLE = ("nhap", "tra_lai")
+FLOW = [("nhap", "CTV"), ("tra_lai", "CTV"), ("cho_duyet", "Admin"), ("da_duyet", "Kế toán"),
+        ("cho_ceo", "CEO"), ("cho_chi", "Kế toán"), ("da_chi", "")]  # thứ tự quy trình, "Từ chối" nằm ngoài
+TURN = {"admin": ("cho_duyet",), "ketoan": ("da_duyet", "cho_chi"), "ceo": ("cho_ceo",), "ctv": ("nhap", "tra_lai")}
+STAFF = ("admin", "ketoan", "ceo")
+LIMIT = 200
 FIELDS = [("address", "địa chỉ công trình"), ("contractor_name", "tên nhà thầu"), ("contractor_phone", "SĐT nhà thầu"),
           ("owner_name", "tên chủ nhà"), ("owner_phone", "SĐT chủ nhà"), ("floors", "số tầng"), ("stage", "giai đoạn thi công")]
 
@@ -116,7 +121,7 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY") or
                    https_only=os.environ.get("HTTPS") == "1", max_age=30 * 86400)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 T = Jinja2Templates(HERE / "templates")
-T.env.globals.update(STATUS=STATUS, BSTATUS=BSTATUS, ROLES=ROLES, HOME=HOME, money=money, problems=photo.problems,
+T.env.globals.update(FLOW=FLOW, LIMIT=LIMIT, STATUS=STATUS, BSTATUS=BSTATUS, ROLES=ROLES, HOME=HOME, money=money, problems=photo.problems,
                      STAGES=photo.STAGES, MIN_PHOTOS=photo.MIN_PHOTOS)
 init()
 
@@ -437,6 +442,26 @@ def review(request: Request, hid: int, action: str = Form(...), reason: str = Fo
         c.execute("update houses set status=?, note=? where id=?", (to, reason, hid))
         note(c, u, STATUS[to][0], hid, text=reason)
     return back("/duyet")
+
+
+# ---------- Tổng quan cho admin, kế toán, CEO ----------
+
+@app.get("/tong-quan")
+def overview(request: Request, trang_thai: str = ""):
+    u = me(request, *STAFF)
+    st = trang_thai if trang_thai in STATUS else ""
+    with db() as c:
+        stats = {r["status"]: r for r in c.execute(
+            "select status, count(*) n, coalesce(sum(amount),0) total from houses group by status")}
+        # ponytail: chỉ hiện 200 hồ sơ mới nhất mỗi bước; thêm phân trang khi số hồ sơ lớn
+        rows = c.execute("select h.*, u.name ctv_name, (select count(*) from photos where house_id=h.id) n "
+                         "from houses h join users u on u.id=h.ctv_id where ?='' or h.status=? "
+                         f"order by h.id desc limit {LIMIT}", (st, st)).fetchall()
+        ctvs = c.execute("select count(*) from users where role='ctv'").fetchone()[0]
+        bs = batches(c)
+    total = lambda *ks: sum(stats[k]["total"] for k in ks if k in stats)
+    return page(request, "overview.html", stats=stats, rows=rows, filter=st, batches=bs, ctvs=ctvs,
+                turn=TURN[u["role"]], paid=total("da_chi"), owed=total("da_duyet", "cho_ceo", "cho_chi"))
 
 
 # ---------- Kế toán tổng hợp, CEO duyệt, chi tiền ----------

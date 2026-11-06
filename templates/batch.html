@@ -2,7 +2,7 @@
 {% set u = request.state.user %}
 {% block title %}Đợt #{{ b.id }}{% endblock %}
 {% block main %}
-<p class="crumb"><a href="{{ HOME[u.role] if u.role != 'admin' else '/duyet' }}">← Danh sách</a></p>
+<p class="crumb"><a href="{{ HOME[u.role] if u.role != 'admin' else '/tong-quan' }}">← Danh sách</a></p>
 <div class="head">
   <h1>Đợt thanh toán #{{ b.id }}</h1>
   <span class="badge {{ BSTATUS[b.status][1] }}">{{ BSTATUS[b.status][0] }}</span>

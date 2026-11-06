@@ -1,0 +1,14 @@
+{# Danh sách đợt thanh toán. Cần: batches #}
+  {% if batches %}
+  <ul class="rows" role="list">
+    {% for b in batches %}
+    <li><a href="/dot/{{ b.id }}">
+      <span class="id">Đợt #{{ b.id }}</span>
+      <span class="main"><strong>{{ money(b.total) }}</strong><small>{{ b.n }} hồ sơ · {{ b.created_at[:16] }}</small></span>
+      <span class="side"><span class="badge {{ BSTATUS[b.status][1] }}">{{ BSTATUS[b.status][0] }}</span></span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty" role="status">Chưa có đợt thanh toán nào.</p>
+  {% endif %}

@@ -1,0 +1,22 @@
+{# Danh sách hồ sơ. Cần: rows, show_ctv, empty_msg #}
+{% if rows %}
+<ul class="rows" role="list">
+  {% for h in rows %}
+  <li>
+    <a href="/nha/{{ h.id }}">
+      <span class="id">#{{ h.id }}</span>
+      <span class="main">
+        <strong>{{ h.address or 'Chưa có địa chỉ' }}</strong>
+        <small>{% if show_ctv %}{{ h.ctv_name }} · {% endif %}{{ h.n }} ảnh · {{ h.created_at[:16] }}{% if h.dup %} · <b class="warn-text">Có thể trùng nhà</b>{% endif %}</small>
+      </span>
+      <span class="side">
+        <span class="badge {{ STATUS[h.status][1] }}">{{ STATUS[h.status][0] }}</span>
+        {% if h.amount %}<small>{{ money(h.amount) }}</small>{% endif %}
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty" role="status">{{ empty_msg }}</p>
+{% endif %}

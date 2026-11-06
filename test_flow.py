@@ -133,6 +133,22 @@ with A.db() as d:
     assert d.execute("select status from houses where id=?", (hid,)).fetchone()[0] == "da_chi"
     assert d.execute("select status from houses where id=?", (hid2,)).fetchone()[0] == "tra_lai"
 
+# tổng quan: cả 3 vai trò nội bộ thấy toàn bộ quy trình, CTV thì không
+login(c, "0911222333")
+assert c.get("/tong-quan").status_code == 403
+for who in ("0900000003", "0900000002"):
+    login(c, who)
+    ov = c.get("/tong-quan").text
+    assert "Tổng quan quy trình" in ov and 'href="/tong-quan"' in ov
+    assert re.search(r"Đã chi cho CTV</dt><dd>50\.000đ", ov), "tổng đã chi"
+    assert re.search(r"Đã chi</strong>.*?<b>1</b> hồ sơ", ov, re.S) and re.search(r"Bị trả lại, cần sửa</strong>.*?<b>1</b> hồ sơ", ov, re.S)
+login(c, "admin", "123")
+ov = c.get("/tong-quan?trang_thai=tra_lai").text
+assert f'href="/nha/{hid2}"' in ov and f'href="/nha/{hid}"' not in ov, "lọc theo bước"
+assert "Việc của bạn" in ov and f'href="/dot/{bid}"' in ov
+assert c.get(f"/dot/{bid}").status_code == 200, "admin xem được đợt thanh toán"
+assert c.get("/tong-quan?trang_thai=xyz").status_code == 200
+
 login(c, "0911222333")
 page = c.get("/cua-toi").text
 assert re.search(r"Đã nhận</dt><dd>50\.000đ", page), "CTV thấy đã nhận 50.000đ"

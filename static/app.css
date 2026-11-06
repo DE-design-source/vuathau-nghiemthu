@@ -70,8 +70,8 @@ button.link { border: 0; background: none; padding: 0; min-height: 0; text-decor
 .badge.bad { color: var(--bad); border-color: #FECDCA; background: var(--bad-bg); }
 .ok-text { color: var(--ok); } .bad-text, .warn-text { color: var(--bad); }
 
-.stats { display: flex; gap: var(--s3); margin: 0 0 var(--s4); }
-.stats div { flex: 1; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3) var(--s4); }
+.stats { display: flex; flex-wrap: wrap; gap: var(--s3); margin: 0 0 var(--s4); }
+.stats div { flex: 1 1 9rem; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3) var(--s4); }
 .stats dt { font-size: .875rem; color: var(--muted); }
 .stats dd { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--navy); }
 
@@ -105,3 +105,29 @@ tfoot th { border-bottom: 0; }
 
 .log { margin: 0; padding-left: var(--s6); font-size: .875rem; color: var(--muted); }
 .log time { font-variant-numeric: tabular-nums; }
+
+/* Menu: trang đang mở */
+.top nav { display: flex; gap: var(--s4); }
+.top nav a[aria-current=page] { box-shadow: inset 0 -2px 0 var(--amber); }
+
+/* Tổng quan: các bước quy trình */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); grid-template-columns: 1fr; counter-reset: none; }
+@media (min-width: 900px) { .flow { grid-template-columns: repeat(4, 1fr); } }
+.flow a { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s1) var(--s3); padding: var(--s2) var(--s3); height: 100%;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); text-decoration: none; color: inherit; }
+.flow .step { width: 1.75rem; height: 1.75rem; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface); color: var(--navy); font-weight: 700; font-size: .875rem; }
+.flow .what { display: grid; }
+.flow .count { display: grid; justify-items: end; text-align: right; line-height: 1.3; }
+@media (min-width: 900px) {
+  .flow a { grid-template-columns: auto 1fr; align-items: start; padding: var(--s3); }
+  .flow .count { grid-column: 2; display: flex; gap: var(--s2); align-items: baseline; flex-wrap: wrap; justify-items: start; }
+}
+.flow .count b { font-size: 1.25rem; color: var(--navy); }
+.flow li.mine a { border-color: var(--amber); background: var(--warn-bg); }
+.flow li.mine .step { background: var(--amber); }
+/* Sau .mine và cùng độ ưu tiên: bước đang chọn / rê chuột luôn có khung navy, kể cả bước "Việc của bạn" */
+.flow li a:hover, .flow li.mine a:hover { border-color: var(--navy); }
+.flow li a[aria-current=true], .flow li.mine a[aria-current=true] { border-color: var(--navy); box-shadow: inset 0 0 0 2px var(--navy); }
+.flow-extra { margin: var(--s3) 0 0; font-size: .9375rem; }
+.flow-extra a[aria-current=true] { font-weight: 700; }

@@ -28,25 +28,7 @@
 </form>
 {% endif %}
 
-{% if rows %}
-<ul class="rows" role="list">
-  {% for h in rows %}
-  <li>
-    <a href="/nha/{{ h.id }}">
-      <span class="id">#{{ h.id }}</span>
-      <span class="main">
-        <strong>{{ h.address or 'Chưa có địa chỉ' }}</strong>
-        <small>{% if not mine %}{{ h.ctv_name }} · {% endif %}{{ h.n }} ảnh · {{ h.created_at[:16] }}{% if h.dup %} · <b class="warn-text">Có thể trùng nhà</b>{% endif %}</small>
-      </span>
-      <span class="side">
-        <span class="badge {{ STATUS[h.status][1] }}">{{ STATUS[h.status][0] }}</span>
-        {% if h.amount %}<small>{{ money(h.amount) }}</small>{% endif %}
-      </span>
-    </a>
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<p class="empty" role="status">{{ 'Chưa có hồ sơ nào. Tải ảnh căn nhà đầu tiên ở trên.' if mine else 'Không có hồ sơ ở trạng thái này.' }}</p>
-{% endif %}
+{% with show_ctv = not mine, empty_msg = 'Chưa có hồ sơ nào. Tải ảnh căn nhà đầu tiên ở trên.' if mine else 'Không có hồ sơ ở trạng thái này.' %}
+{% include "_house_rows.html" %}
+{% endwith %}
 {% endblock %}

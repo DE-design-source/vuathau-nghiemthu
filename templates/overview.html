@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% set u = request.state.user %}
+{% block title %}Tổng quan quy trình{% endblock %}
+{% block main %}
+<h1>Tổng quan quy trình</h1>
+
+<dl class="stats">
+  <div><dt>Đã chi cho CTV</dt><dd>{{ money(paid) }}</dd></div>
+  <div><dt>Đã duyệt, chưa chi</dt><dd>{{ money(owed) }}</dd></div>
+  <div><dt>Cộng tác viên</dt><dd>{{ ctvs }}</dd></div>
+</dl>
+
+<nav aria-labelledby="qt">
+  <h2 id="qt">Các bước (bấm để lọc danh sách)</h2>
+  <ol class="flow" role="list">
+    {% for code, who in FLOW %}{% set s = stats.get(code) %}
+    <li class="{{ 'mine' if code in turn }}">
+      <a href="?trang_thai={{ code }}#ds" {% if code == filter %}aria-current="true"{% endif %}>
+        <span class="step">{{ loop.index }}</span>
+        <span class="what">
+          <strong>{{ STATUS[code][0] }}</strong>
+          <small>{{ 'Người xử lý: ' ~ who if who else 'Hoàn tất' }}{% if code in turn %} · <b>Việc của bạn</b>{% endif %}</small>
+        </span>
+        <span class="count"><b>{{ s.n if s else 0 }}</b> hồ sơ{% if s and s.total %}<small>{{ money(s.total) }}</small>{% endif %}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="flow-extra">
+    <a href="?trang_thai=tu_choi#ds" {% if filter == 'tu_choi' %}aria-current="true"{% endif %}>Từ chối: {{ stats.tu_choi.n if stats.tu_choi else 0 }} hồ sơ</a>
+    · <a href="?#ds" {% if not filter %}aria-current="true"{% endif %}>Xem tất cả</a>
+  </p>
+</nav>
+
+<section aria-labelledby="ds">
+  <h2 id="ds">Hồ sơ: {{ STATUS[filter][0] if filter else 'tất cả' }}{% if rows|length == LIMIT %} ({{ LIMIT }} hồ sơ mới nhất){% endif %}</h2>
+  {% with show_ctv = true, empty_msg = 'Không có hồ sơ ở bước này.' %}{% include "_house_rows.html" %}{% endwith %}
+</section>
+
+<section aria-labelledby="bt">
+  <h2 id="bt">Đợt thanh toán</h2>
+  {% include "_batch_rows.html" %}
+</section>
+{% endblock %}

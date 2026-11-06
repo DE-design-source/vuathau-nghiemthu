@@ -14,7 +14,9 @@
   <a class="brand" href="/">Vua Thầu <span>Nghiệm thu</span></a>
   {% if u %}
   <nav aria-label="Chính">
-    <a href="{{ HOME[u.role] }}">{{ {'ctv':'Hồ sơ của tôi','admin':'Duyệt hồ sơ','ketoan':'Kế toán','ceo':'Đợt thanh toán'}[u.role] }}</a>
+    {% set links = [(HOME[u.role], {'ctv':'Hồ sơ của tôi','admin':'Duyệt hồ sơ','ketoan':'Kế toán','ceo':'Đợt thanh toán'}[u.role])] %}
+    {% if u.role != 'ctv' %}{% set links = links + [('/tong-quan', 'Tổng quan')] %}{% endif %}
+    {% for href, label in links %}<a href="{{ href }}" {% if request.url.path == href %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
   </nav>
   <form method="post" action="/logout" class="who">
     <span>{{ u.name }} · {{ ROLES[u.role] }}</span>
