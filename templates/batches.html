@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block main %}
+<h1>{{ title }}</h1>
+
+{% if pool is not none %}
+<section aria-labelledby="pl">
+  <h2 id="pl">Hồ sơ đã duyệt, chưa lập đợt ({{ pool|length }})</h2>
+  {% if pool %}
+  <form method="post" action="/dot">
+    <div class="table">
+    <table>
+      <thead><tr>
+        <th><input type="checkbox" aria-label="Chọn tất cả" checked onclick="for (const c of this.form.querySelectorAll('[name=ids]')) c.checked = this.checked"></th>
+        <th>Hồ sơ</th><th>CTV</th><th>Tài khoản</th><th class="num">Số tiền</th></tr></thead>
+      <tbody>
+      {% for h in pool %}
+      <tr>
+        <td><input type="checkbox" name="ids" value="{{ h.id }}" checked aria-label="Chọn hồ sơ #{{ h.id }}"></td>
+        <td><a href="/nha/{{ h.id }}">#{{ h.id }}</a> {{ h.address }}</td>
+        <td>{{ h.ctv_name }}</td><td>{{ h.ctv_bank }}</td><td class="num">{{ money(h.amount) }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><th colspan="4">Tổng</th><th class="num">{{ money(pool|sum(attribute='amount')) }}</th></tr></tfoot>
+    </table>
+    </div>
+    <button class="primary">Lập đợt thanh toán, gửi CEO duyệt</button>
+  </form>
+  {% else %}
+  <p class="empty" role="status">Không có hồ sơ nào chờ lập đợt.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section aria-labelledby="bt">
+  <h2 id="bt">Các đợt thanh toán</h2>
+  {% if batches %}
+  <ul class="rows" role="list">
+    {% for b in batches %}
+    <li><a href="/dot/{{ b.id }}">
+      <span class="id">Đợt #{{ b.id }}</span>
+      <span class="main"><strong>{{ money(b.total) }}</strong><small>{{ b.n }} hồ sơ · {{ b.created_at[:16] }}</small></span>
+      <span class="side"><span class="badge {{ BSTATUS[b.status][1] }}">{{ BSTATUS[b.status][0] }}</span></span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty" role="status">Chưa có đợt thanh toán nào.</p>
+  {% endif %}
+</section>
+{% endblock %}

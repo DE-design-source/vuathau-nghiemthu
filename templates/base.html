@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Nghiệm thu{% endblock %} · Vua Thầu</title>
+<link rel="stylesheet" href="/static/app.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+{% set u = request.state.user if request.state.user is defined else None %}
+<a class="skip" href="#main">Bỏ qua tới nội dung</a>
+<header class="top">
+  <a class="brand" href="/">Vua Thầu <span>Nghiệm thu</span></a>
+  {% if u %}
+  <nav aria-label="Chính">
+    <a href="{{ HOME[u.role] }}">{{ {'ctv':'Hồ sơ của tôi','admin':'Duyệt hồ sơ','ketoan':'Kế toán','ceo':'Đợt thanh toán'}[u.role] }}</a>
+  </nav>
+  <form method="post" action="/logout" class="who">
+    <span>{{ u.name }} · {{ ROLES[u.role] }}</span>
+    <button class="link">Đăng xuất</button>
+  </form>
+  {% endif %}
+</header>
+<main id="main">
+  {% set msgs = request.session.pop('flash', []) %}
+  {% if msgs %}<div class="flash" role="status">{% for m in msgs %}<p>{{ m }}</p>{% endfor %}</div>{% endif %}
+  {% block main %}{% endblock %}
+</main>
+</body>
+</html>

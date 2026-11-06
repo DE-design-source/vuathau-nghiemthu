@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block main %}
+<h1>{{ title }}</h1>
+
+{% if mine %}
+<dl class="stats">
+  <div><dt>Đã nhận</dt><dd>{{ money(paid) }}</dd></div>
+  <div><dt>Đang chờ chi</dt><dd>{{ money(pending) }}</dd></div>
+</dl>
+
+<form method="post" action="/nha" enctype="multipart/form-data" class="card stack">
+  <h2>Nộp hồ sơ nhà mới</h2>
+  <label>Ảnh chụp bằng Timemark
+    <input type="file" name="files" accept="image/jpeg,image/png" multiple required>
+    <small>Chọn ảnh từ thư viện (không chụp lại màn hình). Mỗi căn: {{ MIN_PHOTOS }} ảnh hợp lệ được 35.000đ, từ 6 ảnh được 50.000đ. Nên chụp cả bảng hiệu nhà thầu.</small>
+  </label>
+  <button class="primary">Tải ảnh lên</button>
+</form>
+{% else %}
+<form method="get" class="filter">
+  <label>Trạng thái
+    <select name="trang_thai" onchange="this.form.submit()">
+      {% for k, v in STATUS.items() %}<option value="{{ k }}" {{ 'selected' if k == filter }}>{{ v[0] }}</option>{% endfor %}
+    </select>
+  </label>
+  <noscript><button>Lọc</button></noscript>
+</form>
+{% endif %}
+
+{% if rows %}
+<ul class="rows" role="list">
+  {% for h in rows %}
+  <li>
+    <a href="/nha/{{ h.id }}">
+      <span class="id">#{{ h.id }}</span>
+      <span class="main">
+        <strong>{{ h.address or 'Chưa có địa chỉ' }}</strong>
+        <small>{% if not mine %}{{ h.ctv_name }} · {% endif %}{{ h.n }} ảnh · {{ h.created_at[:16] }}{% if h.dup %} · <b class="warn-text">Có thể trùng nhà</b>{% endif %}</small>
+      </span>
+      <span class="side">
+        <span class="badge {{ STATUS[h.status][1] }}">{{ STATUS[h.status][0] }}</span>
+        {% if h.amount %}<small>{{ money(h.amount) }}</small>{% endif %}
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty" role="status">{{ 'Chưa có hồ sơ nào. Tải ảnh căn nhà đầu tiên ở trên.' if mine else 'Không có hồ sơ ở trạng thái này.' }}</p>
+{% endif %}
+{% endblock %}

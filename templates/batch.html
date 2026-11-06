@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% set u = request.state.user %}
+{% block title %}Đợt #{{ b.id }}{% endblock %}
+{% block main %}
+<p class="crumb"><a href="{{ HOME[u.role] if u.role != 'admin' else '/duyet' }}">← Danh sách</a></p>
+<div class="head">
+  <h1>Đợt thanh toán #{{ b.id }}</h1>
+  <span class="badge {{ BSTATUS[b.status][1] }}">{{ BSTATUS[b.status][0] }}</span>
+</div>
+{% if b.note %}<div class="alert bad" role="alert"><strong>CEO trả lại:</strong> {{ b.note }}</div>{% endif %}
+
+<dl class="stats">
+  <div><dt>Tổng chi</dt><dd>{{ money(b.total) }}</dd></div>
+  <div><dt>Số CTV</dt><dd>{{ payees|length }}</dd></div>
+</dl>
+
+{% if u.role == 'ceo' and b.status == 'cho_ceo' %}
+<form method="post" action="/dot/{{ b.id }}/ceo" class="card stack">
+  <h2>CEO duyệt</h2>
+  <label>Lý do (bắt buộc khi trả lại) <textarea name="reason" rows="2" maxlength="500"></textarea></label>
+  <div class="actions">
+    <button class="primary" name="action" value="duyet">Duyệt chi {{ money(b.total) }}</button>
+    <button name="action" value="tra_lai">Trả lại kế toán</button>
+  </div>
+</form>
+{% elif u.role == 'ketoan' and b.status == 'cho_chi' %}
+<form method="post" action="/dot/{{ b.id }}/da-chi" class="card stack">
+  <h2>Chi tiền</h2>
+  <p>CEO đã duyệt. Chuyển khoản theo bảng dưới (hoặc tải file CSV), xong thì xác nhận.</p>
+  <div class="actions"><button class="primary">Xác nhận đã chi {{ money(b.total) }}</button></div>
+</form>
+{% endif %}
+
+<section aria-labelledby="pa">
+  <div class="head"><h2 id="pa">Theo cộng tác viên</h2><a href="/dot/{{ b.id }}/csv">Tải CSV</a></div>
+  {% if payees %}
+  <div class="table"><table>
+    <thead><tr><th>CTV</th><th>SĐT</th><th>Tài khoản</th><th class="num">Hồ sơ</th><th class="num">Số tiền</th></tr></thead>
+    <tbody>{% for p in payees %}
+      <tr><td>{{ p.name }}</td><td>{{ p.phone }}</td><td>{{ p.bank }}</td><td class="num">{{ p.n }}</td><td class="num">{{ money(p.total) }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">Đợt đã được trả lại, các hồ sơ quay về danh sách chờ lập đợt.</p>{% endif %}
+</section>
+
+{% if houses %}
+<section aria-labelledby="hs">
+  <h2 id="hs">Hồ sơ trong đợt</h2>
+  <ul class="rows" role="list">{% for h in houses %}
+    <li><a href="/nha/{{ h.id }}"><span class="id">#{{ h.id }}</span>
+      <span class="main"><strong>{{ h.address }}</strong><small>{{ h.ctv_name }} · {{ h.floors }} tầng · {{ h.stage }}</small></span>
+      <span class="side"><small>{{ money(h.amount) }}</small></span></a></li>
+  {% endfor %}</ul>
+</section>
+{% endif %}
+
+<section aria-labelledby="ls">
+  <h2 id="ls">Lịch sử</h2>
+  <ol class="log">{% for l in logs %}<li><time>{{ l.at[:16] }}</time> {{ l.name }}: {{ l.action }}{% if l.note %} · {{ l.note }}{% endif %}</li>{% endfor %}</ol>
+</section>
+{% endblock %}

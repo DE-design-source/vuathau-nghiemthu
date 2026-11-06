@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% set u = request.state.user %}
+{% block title %}Hồ sơ #{{ h.id }}{% endblock %}
+{% block head %}{% if h.ai_state == 'dang_doc' %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block main %}
+<p class="crumb"><a href="{{ HOME[u.role] }}">← Danh sách</a></p>
+<div class="head">
+  <h1>Hồ sơ #{{ h.id }}</h1>
+  <span class="badge {{ STATUS[h.status][1] }}">{{ STATUS[h.status][0] }}</span>
+</div>
+
+{% if h.note and h.status in ('tra_lai', 'tu_choi') %}
+<div class="alert bad" role="alert"><strong>Lý do {{ 'trả lại' if h.status == 'tra_lai' else 'từ chối' }}:</strong> {{ h.note }}</div>
+{% endif %}
+{% if h.ai_state == 'dang_doc' %}
+<div class="alert info" role="status">AI đang đọc ảnh (thời gian, địa chỉ, bảng nhà thầu, số tầng)… Trang tự tải lại.</div>
+{% elif h.ai_state == 'loi' %}
+<div class="alert warn" role="status">AI chưa đọc được ảnh lần này. Vui lòng tự điền các ô bên dưới.</div>
+{% endif %}
+
+<dl class="stats">
+  <div><dt>Ảnh hợp lệ</dt><dd>{{ valid }} / {{ ps|length }}</dd></div>
+  <div><dt>{{ 'Số tiền' if h.amount else 'Dự kiến nhận' }}</dt><dd>{{ money(h.amount or pay) }}</dd></div>
+</dl>
+
+{% if editable and miss %}
+<div class="alert warn" role="alert">
+  <strong>Cần bổ sung trước khi gửi duyệt:</strong>
+  <ul>{% for m in miss %}<li>{{ m }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if u.role == 'admin' and h.status == 'cho_duyet' %}
+<section class="card stack review" aria-labelledby="rv">
+  <h2 id="rv">Duyệt hồ sơ</h2>
+  {% if h.dup %}<p class="alert warn">{{ h.dup }}</p>{% endif %}
+  <p>CTV: <strong>{{ h.ctv_name }}</strong> · {{ h.ctv_phone }}
+    {% if h.lat is not none %} · <a href="https://maps.google.com/?q={{ h.lat }},{{ h.lng }}" target="_blank" rel="noopener">Xem vị trí trên bản đồ</a>{% endif %}</p>
+  <form method="post" action="/nha/{{ h.id }}/duyet" class="stack">
+    <label>Lý do (bắt buộc khi trả lại hoặc từ chối)
+      <textarea name="reason" rows="2" maxlength="500"></textarea></label>
+    <div class="actions">
+      <button class="primary" name="action" value="duyet">Duyệt · {{ money(h.amount) }}</button>
+      <button name="action" value="tra_lai">Trả lại cho CTV sửa</button>
+      <button class="danger" name="action" value="tu_choi">Từ chối</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section aria-labelledby="ph">
+  <h2 id="ph">Ảnh ({{ ps|length }})</h2>
+  <ul class="photos" role="list">
+    {% for p in ps %}{% set bad = problems(p) %}
+    <li class="{{ 'bad' if bad else 'ok' }}">
+      <a href="/anh/{{ p.id }}?goc=1" target="_blank" rel="noopener"><img src="/anh/{{ p.id }}" alt="Ảnh {{ loop.index }}" loading="lazy"></a>
+      <div class="meta">
+        <p>{{ p.exif_time or p.ai_time or 'Không rõ giờ' }}</p>
+        <p class="muted">{{ p.address or (p.lat is not none and '%.5f, %.5f'|format(p.lat, p.lng)) or 'Không rõ vị trí' }}</p>
+        {% if bad %}{% for b in bad %}<p class="bad-text">✗ {{ b }}</p>{% endfor %}{% else %}<p class="ok-text">✓ Hợp lệ</p>{% endif %}
+        {% if editable %}
+        <form method="post" action="/nha/{{ h.id }}/anh/{{ p.id }}/xoa"><button class="link" aria-label="Xoá ảnh {{ loop.index }}">Xoá</button></form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if editable %}
+  <form method="post" action="/nha/{{ h.id }}/anh" enctype="multipart/form-data" class="inline">
+    <label>Thêm ảnh <input type="file" name="files" accept="image/jpeg,image/png" multiple required></label>
+    <button>Tải lên</button>
+  </form>
+  {% endif %}
+</section>
+
+<section aria-labelledby="tt">
+  <h2 id="tt">Thông tin công trình</h2>
+  {% if editable %}
+  <form method="post" class="card grid">
+    {% macro field(name, label, type='text', mode='') %}
+    <label>{{ label }}
+      <input name="{{ name }}" type="{{ type }}" value="{{ h[name] or '' }}" {% if mode %}inputmode="{{ mode }}"{% endif %}
+        {% if not h[name] %}aria-invalid="true"{% endif %}></label>
+    {% endmacro %}
+    <label class="wide">Địa chỉ công trình
+      <input name="address" value="{{ h.address }}" {% if not h.address %}aria-invalid="true"{% endif %}></label>
+    {{ field('contractor_name', 'Tên nhà thầu') }}
+    {{ field('contractor_phone', 'SĐT nhà thầu', 'tel', 'tel') }}
+    {{ field('owner_name', 'Tên chủ nhà') }}
+    {{ field('owner_phone', 'SĐT chủ nhà', 'tel', 'tel') }}
+    {{ field('floors', 'Số tầng', 'number', 'numeric') }}
+    <label>Giai đoạn thi công
+      <select name="stage" {% if not h.stage %}aria-invalid="true"{% endif %}>
+        <option value="">Chọn…</option>
+        {% for s in STAGES %}<option {{ 'selected' if s == h.stage }}>{{ s }}</option>{% endfor %}
+      </select></label>
+    <div class="actions wide">
+      <button name="action" value="luu">Lưu nháp</button>
+      <button class="primary" name="action" value="gui">Gửi duyệt</button>
+    </div>
+  </form>
+  {% else %}
+  <dl class="info card">
+    <dt>Địa chỉ</dt><dd>{{ h.address or '—' }}</dd>
+    <dt>Nhà thầu</dt><dd>{{ h.contractor_name or '—' }} · {{ h.contractor_phone or '—' }}</dd>
+    <dt>Chủ nhà</dt><dd>{{ h.owner_name or '—' }} · {{ h.owner_phone or '—' }}</dd>
+    <dt>Số tầng</dt><dd>{{ h.floors or '—' }}</dd>
+    <dt>Giai đoạn</dt><dd>{{ h.stage or '—' }}</dd>
+    {% if u.role != 'ctv' %}<dt>CTV</dt><dd>{{ h.ctv_name }} · {{ h.ctv_phone }} · {{ h.ctv_bank }}</dd>{% endif %}
+    {% if h.batch_id and u.role != 'ctv' %}<dt>Đợt thanh toán</dt><dd><a href="/dot/{{ h.batch_id }}">#{{ h.batch_id }}</a></dd>{% endif %}
+  </dl>
+  {% endif %}
+</section>
+
+{% if logs %}
+<section aria-labelledby="ls">
+  <h2 id="ls">Lịch sử</h2>
+  <ol class="log">{% for l in logs %}<li><time>{{ l.at[:16] }}</time> {{ l.name }}: {{ l.action }}{% if l.note %} · {{ l.note }}{% endif %}</li>{% endfor %}</ol>
+</section>
+{% endif %}
+{% endblock %}
